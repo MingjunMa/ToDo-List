@@ -1,0 +1,206 @@
+#!/bin/bash
+
+DATA_PATH="$HOME/.todo/tasks"
+OP=$1
+CHECK=1
+
+function init(){
+	cd $HOME
+	mkdir -p .todo
+	#init line1 to line3
+	echo -e "1\n$\n$" > $DATA_PATH
+	chmod 777 $DATA_PATH
+	echo "Initialized successfully."
+}
+
+function check_init(){
+	if [ -e "$HOME/.todo/tasks" ]
+       	then CHECK=0
+       	else echo "Please run 'todo init' before running '$OP' command."
+       	fi
+}
+
+function list(){
+	if [ $(head -n 1 $DATA_PATH) == "1" ]
+       	then echo -e "# To be done\nEmpty\n# Completed\nEmpty"
+       	else
+		#TBD
+		echo "# To be done"
+		#use count to record the num of TBD items
+		count=0
+		for index in $(sed -n 2p $DATA_PATH)
+		do
+			count=$((count+1))
+		done
+
+		#print TBD items according to the line2
+		if [[ "$count" == "1" ]]
+		then echo "Empty"
+		else
+			for index in $(sed -n 2p $DATA_PATH)
+			do
+				#skip the flag
+				if [[ "$index" == "$" ]]
+				then	continue
+				else tbd_line_num=$(($(sed -n '4,$p' $DATA_PATH | grep -n "${index}" | cut -d":" -f1)+3))
+				echo $(sed -n ${tbd_line_num}p $DATA_PATH)
+				fi
+			done
+		fi
+
+		#Completed
+		echo "# Completed"
+		#use count to record the num of completed items
+		count=0
+		for index in $(sed -n 3p $DATA_PATH)
+		do
+			count=$((count+1))
+		done
+
+		#print completed items according to the line3
+		if [[ "$count" == "1" ]]
+		then echo "Empty"
+		else
+			for index in $(sed -n 3p $DATA_PATH)
+			do
+				#skip the flag
+				if [[ "$index" == "$" ]];
+				then	continue
+				else completed_line_num=$(($(sed -n '4,$p' $DATA_PATH | grep -n "${index}" | cut -d":" -f1)+3))
+				echo $(sed -n ${completed_line_num}p $DATA_PATH)
+			fi
+		done
+		fi
+       	fi
+}
+
+function add(){
+	#append ID(line1) to line2(records tbd's ID)
+	sed -i "2c $(sed -n 2p $DATA_PATH) $(sed -n 1p $DATA_PATH)" $DATA_PATH
+	#add ID+content to the end of file
+	echo "$(head -n 1 $DATA_PATH) ${@:2}"  >> $DATA_PATH
+	#ID++
+	sed -i "1c $(($(head -n 1 $DATA_PATH)+1))" $DATA_PATH
+}
+
+function edit(){
+	#check if id exists
+	if [[ "$(sed -n 2p $DATA_PATH | grep $2)" == "" ]]
+       	then echo "Task not found!"
+
+	#get line from line4 ~ end line | search the line which has target ID($2) | get the line's num (relative num)
+	else edit_line=$(sed -n '4,$p' $DATA_PATH | cut -d " " -f1 | grep -n "$2" | cut -d ":" -f1);
+	#calculate absolute line num (relative num + 3)
+	edit_line=$((${edit_line}+3))
+
+	#get new content
+	new_content=${@:2}
+	#rewrite the item
+	sed -i "${edit_line}c ${new_content}" $DATA_PATH
+	fi
+}
+
+function remove(){
+	for id in ${@:2}
+	do
+		#remove content
+		#locate the line
+		relative_line_num=$(sed -n '4,$p' $DATA_PATH | cut -d " " -f1 | grep -n "$id" | cut -d ":" -f1)
+		#check if the id exists
+		if [[ "${relative_line_num}" == "" ]]
+	       	then	continue
+	       	fi
+		#calculate line num and delete content according to absolute line num
+		absolute_line_num=$((${relative_line_num}+3))
+		sed -i "${absolute_line_num}d" $DATA_PATH
+
+		#remove $id in line2
+		grep_line_num=$(sed -n '2p' $DATA_PATH | tr ' ' '\n' | cut -f1 | grep -n "${id}" | cut -d ":" -f1)
+		if [[ "${grep_line_num}" != "" ]]
+		then
+			#remove $id, creat new_line and rewrite in line2
+			new_line=$(sed -n '2p' $DATA_PATH | tr ' ' '\n' | sed "${grep_line_num}d" | tr '\n' ' ')
+			sed -i "2c ${new_line}" $DATA_PATH;
+		fi
+
+		#remove $id in line3
+		grep_line_num=$(sed -n '3p' $DATA_PATH | tr ' ' '\n' | cut -f1 | grep -n "${id}" | cut -d ":" -f1)
+		if [[ "${grep_line_num}" != "" ]]
+		then
+			#remove $id, creat new_line and rewrite in line3
+			new_line=$(sed -n '3p' $DATA_PATH | tr ' ' '\n' | sed "${grep_line_num}d" | tr '\n' ' ')
+			sed -i "3c ${new_line}" $DATA_PATH;
+		fi
+	done
+}
+
+function mark(){
+	for id in ${@:2}
+	do
+		#search if $id in line2
+		search_result=$(sed -n '2p' $DATA_PATH | tr ' ' '\n' | cut -f1 | grep -n "${id}" | cut -d ":" -f1)
+		if [[ "${search_result}" == "" ]]
+		then 	continue
+		else
+			#add the $id in line3
+		     	sed -i "3c $(sed -n 3p $DATA_PATH) $id" $DATA_PATH
+		     	#remove the $id in line2
+		     	new_line=$(sed -n '2p' $DATA_PATH | tr ' ' '\n' | sed "${search_result}d" | tr '\n' ' ')
+		     	sed -i "2c ${new_line}" $DATA_PATH
+		fi
+	done
+}
+
+function unmark(){
+	for id in ${@:2}
+	do
+		#search if $id in line3
+		search_result=$(sed -n '3p' $DATA_PATH | tr ' ' '\n' | cut -f1 | grep -n "${id}" | cut -d ":" -f1)
+		if [[ "${search_result}" == "" ]];
+		then 	continue
+		else
+			#add the $id in line2
+		    	sed -i "2c $(sed -n 2p $DATA_PATH) $id" $DATA_PATH
+		    	#remove the $id in line3
+		     	new_line=$(sed -n '3p' $DATA_PATH | tr ' ' '\n' | sed "${search_result}d" | tr '\n' ' ')
+		     	sed -i "3c ${new_line}" $DATA_PATH
+		fi
+	done
+}
+
+function reset(){
+	cd $HOME
+	mkdir -p .todo
+	#init line1 to line3
+	echo -e "1\n$\n$" > $DATA_PATH
+	chmod 777 $DATA_PATH
+}
+
+case $1 in
+	"") echo "usage: todo <init|list|add|edit|remove|reset|mark|unmark> [args]"
+	;;
+	"init") init
+	;;
+	"list")	check_init
+		if [ "$CHECK" == "0" ]; then list; fi
+	;;
+	"add") 	check_init
+		if [ "$CHECK" == "0" ]; then add ${@}; fi
+	;;
+	"edit")	check_init
+		if [ "$CHECK" == "0" ]; then edit ${@}; fi
+	;;
+	"remove") check_init
+		if [ "$CHECK" == "0" ]; then remove ${@}; fi
+	;;
+	"mark")  check_init
+		if [ "$CHECK" == "0" ]; then mark ${@}; fi
+	;;
+	"unmark") check_init
+		if [ "$CHECK" == "0" ]; then unmark ${@}; fi
+	;;
+	"reset") check_init
+		if [ "$CHECK" == "0" ]; then reset; fi
+	;;
+	*) echo "Unknown command: '$1'!"
+esac
