@@ -1,5 +1,5 @@
 # ToDo-List
-A todo recording shell
+A todo record shell
 
 # Assignment todo CLI
 
