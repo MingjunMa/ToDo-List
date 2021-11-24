@@ -3,8 +3,6 @@ A todo recording shell
 
 # Assignment todo CLI
 
-`todo` 命令是一个待办清单（to-do list）类的软件，用于帮助我们进行简单的任务管理。
-
 ### `init` command
 
 用户在初次使用时，须先执行该命令以进行必要的初始化操作，如：创建保存数据的文件。
