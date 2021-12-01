@@ -86,17 +86,18 @@ function add(){
 function edit(){
 	#check if id exists
 	if [[ "$(sed -n 2p $DATA_PATH | grep $2)" == "" ]]
-       	then echo "Task not found!"
+       	then	
+		if [[ "$(sed -n 3p $DATA_PATH | grep $2)" == "" ]]
+		#get line from line4 ~ end line | search the line which has target ID($2) | get the line's num (relative num)
+		else edit_line=$(sed -n '4,$p' $DATA_PATH | cut -d " " -f1 | grep -n "$2" | cut -d ":" -f1);
+		#calculate absolute line num (relative num + 3)
+		edit_line=$((${edit_line} + 3))
 
-	#get line from line4 ~ end line | search the line which has target ID($2) | get the line's num (relative num)
-	else edit_line=$(sed -n '4,$p' $DATA_PATH | cut -d " " -f1 | grep -n "$2" | cut -d ":" -f1);
-	#calculate absolute line num (relative num + 3)
-	edit_line=$((${edit_line} + 3))
-
-	#get new content
-	new_content=${@:2}
-	#rewrite the item
-	sed -i "${edit_line}c ${new_content}" $DATA_PATH
+		#get new content
+		new_content=${@:2}
+		#rewrite the item
+		sed -i "${edit_line}c ${new_content}" $DATA_PATH
+		fi
 	fi
 }
 
